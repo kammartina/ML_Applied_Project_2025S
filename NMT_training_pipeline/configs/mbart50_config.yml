@@ -1,0 +1,24 @@
+model_type: "mbart"
+model_name_or_path: "facebook/mbart-large-50-one-to-many-mmt"
+tokenizer_name: "facebook/mbart-large-50-one-to-many-mmt"
+seed: 42
+
+src_lang_code: "en_XX"
+tgt_lang_code: "de_DE"
+
+train_file: "/home/mlt_ml2/ML_Applied_Project_2025S/datasplit_json/train.clean.jsonl"
+val_file: "/home/mlt_ml2/ML_Applied_Project_2025S/datasplit_json/val.clean.jsonl"
+
+source_lang: "en"
+target_lang: "de"
+
+max_source_length: 128
+max_target_length: 128
+
+output_dir: "outputs/mbart50"
+per_device_train_batch_size: 16
+per_device_eval_batch_size: 16
+learning_rate: 3e-5
+num_train_epochs: 3
+eval_steps: 500
+save_total_limit: 2
