@@ -25,8 +25,6 @@ with open(input_jsonl, "r", encoding="utf-8") as infile, open(tsv_path, "w", enc
 
 """# Install numpay and add Preprocessing Steps"""
 
-!pip install numpy==1.24
-
 def escape_special_chars(text):
     """Escapes special characters that might cause problems for bicleaner."""
     # Replace tabs with spaces
@@ -68,14 +66,14 @@ with open(input_jsonl, "r", encoding="utf-8") as infile, open(tsv_path, "w", enc
 # Run Bicleaner
 
 # Run Bicleaner
-!bicleaner-hardrules -s en -t de /content/train.en-de /content/train.classified
+#!bicleaner-hardrules -s en -t de /content/train.en-de /content/train.classified
 
 # Filter Good Pairs
-!grep '1$' /content/train.classified > /content/train.clean
+#!grep '1$' /content/train.classified > /content/train.clean
 
 # Summary
-!wc -l /content/train.en-de
-!wc -l /content/train.clean
+#!wc -l /content/train.en-de
+#!wc -l /content/train.clean
 
 # Convert Clean Output Back to JSONL
 clean_jsonl = "/content/train.clean.jsonl"
