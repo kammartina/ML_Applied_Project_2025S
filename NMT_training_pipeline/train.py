@@ -1,5 +1,5 @@
 import yaml
-#import wandb
+import os
 from datasets import load_dataset
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer, Seq2SeqTrainer, Seq2SeqTrainingArguments, DataCollatorForSeq2Seq
 from transformers import set_seed
@@ -14,69 +14,61 @@ def load_config(config_path):
     with open(config_path, "r") as file:
         return yaml.safe_load(file)
     
-
-def preprocess_function(examples, tokenizer, config, model_type):
-    inputs, targets = [], []
-
-    for item in tqdm(examples["translation"], desc="Tokenizing examples", total=len(examples["translation"])):
-        src = item.get(config["source_lang"])
-        tgt = item.get(config["target_lang"])
-        if src and tgt:
-            if model_type == "t5":
-                input_text = f"translate {config['source_lang']} to {config['target_lang']}: {src}"
-                inputs.append(input_text)
-                targets.append(tgt)
-            else:
-                inputs.append(src)
-                targets.append(tgt)
-       
-    model_inputs = tokenizer(inputs, max_length=config["max_source_length"], padding=True, truncation=True)
-    labels = tokenizer(targets, max_length=config["max_target_length"], padding=True, truncation=True)
-    # Setup the tokenizer for targets
-    labels_ids = [[(token if token != tokenizer.pad_token_id else -100) for token in label] for label in labels["input_ids"]]
-    
-    model_inputs["labels"] = labels_ids
-    return model_inputs
-
-def load_and_preprocess_data(config, tokenizer, fraction=0.01, max_train = 800, max_valid = 100, max_test = 100, shuffle=False):
-    """Load and preprocess the dataset."""
-    # Load raw datasets with a progress bar
+def get_train_val_datasets(train_file, val_file, fraction=0.01, max_train=800, max_valid=100, shuffle=False):
+    """Load and return train and validation datasets (optionally shuffled and subsetted)."""
     print("Loading raw datasets...")
     raw_datasets = load_dataset(
         "json",
-        data_files={"train": config["train_file"], "validation": config["val_file"]},
+        data_files={"train": train_file, "validation": val_file},
         split={
-        "train": f"train[:{int(fraction * 100)}%]",
-        "validation": f"validation[:{int(fraction * 100)}%]"
-    }
+            "train": f"train[:{int(fraction * 100)}%]",
+            "validation": f"validation[:{int(fraction * 100)}%]"
+        }
     )
 
-    # Select a subset of the data for training and validation
     print("Selecting subsets...")
+    train_dataset = raw_datasets["train"]
+    val_dataset = raw_datasets["validation"]
+
     if shuffle:
-        train_dataset = raw_datasets["train"].shuffle(seed=42)
-        val_dataset = raw_datasets["validation"].shuffle(seed=42)
-    if len(raw_datasets["train"]) > max_train:
-        train_dataset = raw_datasets["train"].select(range(max_train))
-    if len(raw_datasets["validation"]) > max_valid:
-        val_dataset = raw_datasets["validation"].select(range(max_valid))
-    
+        train_dataset = train_dataset.shuffle(seed=42)
+        val_dataset = val_dataset.shuffle(seed=42)
+    if len(train_dataset) > max_train:
+        train_dataset = train_dataset.select(range(max_train))
+    if len(val_dataset) > max_valid:
+        val_dataset = val_dataset.select(range(max_valid))
 
     print(f"Number of training examples: {len(train_dataset)}")
     print(f"Number of validation examples: {len(val_dataset)}")
+    return train_dataset, val_dataset
 
-    # Tokenize datasets
-    tokenized_train = train_dataset.map(lambda x: preprocess_function(x, tokenizer, config, config["model_type"]),
-        batched=True,
-        remove_columns=train_dataset.column_names, desc ="Tokenizing train dataset"
-    )
-    # Tokenize validation dataset
-    tokenized_val = val_dataset.map(lambda x: preprocess_function(x, tokenizer, config, config["model_type"]),
-        batched=True,
-        remove_columns=val_dataset.column_names, desc="Tokenizing validation dataset"
-    )
+def preprocess_and_tokenize(dataset, model_type, tokenizer, src_lang, tgt_lang, max_src_length, max_tgt_length, desc="Tokenizing dataset"):
+    """Preprocess and tokenize a dataset."""
+    def preprocess_function(examples):
+        inputs, targets = [], []
+        for item in examples["translation"]:
+            src = item.get(src_lang)
+            tgt = item.get(tgt_lang)
+            if src and tgt:
+                if model_type == "t5":
+                    input_text = f"translate {src_lang} to {tgt_lang}: {src}"
+                    inputs.append(input_text)
+                    targets.append(tgt)
+                else:
+                    inputs.append(src)
+                    targets.append(tgt)
+        model_inputs = tokenizer(inputs, max_length=max_src_length, padding=True, truncation=True)
+        labels = tokenizer(targets, max_length=max_tgt_length, padding=True, truncation=True)
+        labels_ids = [[(token if token != tokenizer.pad_token_id else -100) for token in label] for label in labels["input_ids"]]
+        model_inputs["labels"] = labels_ids
+        return model_inputs
 
-    return tokenized_train, tokenized_val
+    return dataset.map(
+        preprocess_function,
+        batched=True,
+        remove_columns=dataset.column_names,
+        desc=desc
+    )
 
 
 def compute_metrics(eval_preds, tokenizer):
@@ -93,21 +85,17 @@ def compute_metrics(eval_preds, tokenizer):
     decoded_preds = [pred.strip() for pred in decoded_preds]
     decoded_labels = [[label.strip()] for label in decoded_labels]
 
-
-    #print("Decoded Predictions:", decoded_preds[:5])  # Print first 5 predictions
-    #print("Decoded Labels:", decoded_labels[:5]) 
-
     # Compute BLEU score
     bleu_score = corpus_bleu(decoded_preds, decoded_labels).score
 
     return {"bleu": bleu_score}
 
-def objective(trial, model, tokenizer, tokenized_train, tokenized_val, data_collator):
-    try:
+#def objective(trial, model, tokenizer, tokenized_train, tokenized_val, data_collator):
+    #try:
         # Sample hyperparameters
-        learning_rate = trial.suggest_float("learning_rate", 1e-5, 5e-4, log=True)
-        batch_size = trial.suggest_categorical("batch_size", [10, 20])
-        num_train_epochs = trial.suggest_int("num_train_epochs", 3, 5)
+        #learning_rate = trial.suggest_float("learning_rate", 1e-5, 5e-4, log=True)
+        #batch_size = trial.suggest_categorical("batch_size", [10, 20])
+        #num_train_epochs = trial.suggest_int("num_train_epochs", 3, 5)
 
         # Log hyperparameters to WandB
         #wandb.config.update({
@@ -115,56 +103,50 @@ def objective(trial, model, tokenizer, tokenized_train, tokenized_val, data_coll
         #"batch_size": batch_size,
             #"num_train_epochs": num_train_epochs
     # })
+def train(model, tokenizer, tokenized_train, tokenized_val, data_collator, learning_rate, weight_decay, batch_size, num_epoch, seed = 224):
+    training_args = Seq2SeqTrainingArguments(
+        output_dir=f"NMT_training_pipeline/trained_model",
+        logging_dir=f"NMT_training_pipeline/logs",
+        eval_strategy="epoch",
+        save_strategy="no",
+        learning_rate=learning_rate,
+        weight_decay=weight_decay,
+        per_device_train_batch_size=batch_size,
+        per_device_eval_batch_size=batch_size,
+        num_train_epochs=num_epoch,
+        logging_strategy="steps",
+        logging_steps=40,
+        report_to="tensorboard",
+        predict_with_generate=True,
+        seed=seed
+    )
 
-        training_args = Seq2SeqTrainingArguments(
-            output_dir=f"./optuna_trial_{trial.number}",
-            logging_dir=f"./logs/optuna_trial_{trial.number}",
-            eval_strategy="epoch",
-            save_strategy="epoch",
-            learning_rate=learning_rate,
-            per_device_train_batch_size=batch_size,
-            per_device_eval_batch_size=batch_size,
-            num_train_epochs=num_train_epochs,
-            logging_strategy="steps",
-            logging_steps=100,
-            report_to="tensorboard",
-            load_best_model_at_end=True,
-            predict_with_generate=True,
-            seed=224
-        )
+    trainer = Seq2SeqTrainer(
+        model=model,
+        args=training_args,
+        train_dataset=tokenized_train,
+        eval_dataset=tokenized_val,
+        tokenizer=tokenizer,
+        data_collator=data_collator,
+        compute_metrics=partial(compute_metrics, tokenizer=tokenizer) 
+    )
 
-        trainer = Seq2SeqTrainer(
-            model=model,
-            args=training_args,
-            train_dataset=tokenized_train,
-            eval_dataset=tokenized_val,
-            tokenizer=tokenizer,
-            data_collator=data_collator,
-            compute_metrics=partial(compute_metrics, tokenizer=tokenizer) 
-        )
+        
+    trainer.train()
+    # Save the model
+    trainer.save_model()
+    # Evaluate and return BLEU score
+    eval_results = trainer.evaluate()
+    bleu_score = eval_results.get("eval_bleu", None)
+    print(f"BLEU score: {bleu_score}")
+    return bleu_score
 
-        #for epoch in tqdm(range(num_train_epochs), desc="Training epochs"):     
-            #print(f"Epoch {epoch + 1}/{num_train_epochs}")
-            # Train the model
-        trainer.train()
-
-        # Evaluate and return BLEU score
-        eval_results = trainer.evaluate()
-        bleu_score = eval_results.get("eval_bleu", None)
-
-        if bleu_score is None:
-            raise ValueError("BLEU score is None. Evaluation failed.")
-
-        return bleu_score
-
-    except Exception as e:
-        print(f"Trial {trial.number} failed with exception: {e}")
-        return 0.0  # Return a default value to avoid trial failure
-
+  
 def main():
     # Initialize WandB
     #wandb.init(project="ML for Translation Task", name="Model Training")
-    config_path = "/home/mlt_ml2/ML_Applied_Project_2025S/NMT_training_pipeline/configs/t5_config.yml"
+    summary_path = "NMT_training_pipeline/training_summary.tsv"
+    config_path = "NMT_training_pipeline/configs/nllb_config.yml"
     print("Loading configurations:")
 
 
@@ -174,43 +156,79 @@ def main():
     # Load tokenizer and model
     tokenizer = AutoTokenizer.from_pretrained(config["tokenizer_name"])
     model = AutoModelForSeq2SeqLM.from_pretrained(config["model_name_or_path"])
+    model_type = config["model_type"]
+    src_lang_code = config.get["src_lang_code", ""]
+    tgt_lang_code = config.get["src_lang_code", ""]
+    src_lang = config['source_lang']
+    tgt_lang = config['target_lang']
+    max_src_length = config["max_source_length"]
+    max_tgt_length = config["max_target_length"]
+    train_file = config["train_file"]
+    val_file = config["val_file"]
 
-    if config.get("model_type", "").lower().startswith("mbart"):
-        tokenizer.src_lang = config["src_lang_code"]
-        tokenizer.tgt_lang = config["tgt_lang_code"]
-        model.config.forced_bos_token_id = tokenizer.convert_tokens_to_ids(config["tgt_lang_code"])
+    if src_lang_code and tgt_lang_code:
+        tokenizer.src_lang = src_lang_code
+        tokenizer.tgt_lang = tgt_lang_code
+
+    if model_type.lower().startswith("mbart"):
+        model.config.forced_bos_token_id = tokenizer.convert_tokens_to_ids(tgt_lang_code)
 
     # Load and preprocess data
-    tokenized_train, tokenized_val = load_and_preprocess_data(config, tokenizer)
+    train_dataset, val_dataset = get_train_val_datasets(train_file, val_file)
+    tokenized_train = preprocess_and_tokenize(train_dataset, model_type, tokenizer, src_lang, tgt_lang, max_src_length, max_tgt_length, desc="Tokenizing train dataset")
+    tokenized_val = preprocess_and_tokenize(val_dataset, model_type, tokenizer, src_lang_code, tgt_lang_code, max_src_length, max_tgt_length, desc="Tokenizing validation dataset")
 
     # Data collator
     data_collator = DataCollatorForSeq2Seq(tokenizer=tokenizer, model=model)
+    learning_rate = config["learning_rate"]
+    weight_decay = config["weight_decay"]
+    batch_size = config["batch_size"]
+    num_epoch = config["num_epoch"]
 
-    study = optuna.create_study(direction="maximize")  # Maximize BLEU score
-    study.optimize((partial(
-        objective,
-        model=model,
-        tokenizer=tokenizer,
-        tokenized_train=tokenized_train,
-        tokenized_val=tokenized_val,
-        data_collator=data_collator
-    )), n_trials=2)  # Run 5 trials
+    #study = optuna.create_study(direction="maximize")  # Maximize BLEU score
+    #study.optimize((partial(
+        #objective,
+        #model=model,
+        #tokenizer=tokenizer,
+        #tokenized_train=tokenized_train,
+        #tokenized_val=tokenized_val,
+        #data_collator=data_collator
+    #)), n_trials=2)  # Run 2 trials
 
     # Print the best trial
-    print("Best trial:")
-    print(f" Value: {study.best_trial.value}")
-    print("  Params:")
-    for key, value in study.best_trial.params.items():
-        print(f"    {key}: {value}")
-        config[key] = value  
-
+    #print("Best trial:")
+    #print(f" Value: {study.best_trial.value}")
+    #print("  Params:")
+    #for key, value in study.best_trial.params.items():
+       # print(f"    {key}: {value}")
+        #config[key] = value  
+    bleu_score = train(
+        model, 
+        tokenizer, 
+        tokenized_train, 
+        tokenized_val, 
+        data_collator, 
+        learning_rate, 
+        weight_decay, 
+        batch_size, 
+        num_epoch  
+    )
+    
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+    write_header = not os.path.exists(summary_path)
+    with open(summary_path, "a", encoding="utf-8") as f:
+        if write_header:
+            f.write("model\ttime\tbleu_score\tlearning_rate\tbatch_size\tnum_epoch\tweight_decay\n")
+        f.write(f"{model}\t{timestamp}\t{bleu_score}\t{learning_rate}\t{batch_size}\t{num_epoch}\t{weight_decay}\n")
+    
+    
     # Add date/time and BLEU score to config
-    config["last_trained"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
-    config["best_bleu_score"] = study.best_trial.value  
+    #config["last_trained"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+    #config["bleu_score"] = bleu_score
 
-    with open(config_path, "w") as file:
-        yaml.dump(config, file)
+    #with open(config_path, "w") as file:
+        #yaml.dump(config, file)
 
-    print(f"Updated config saved to {config_path}")
+    #print(f"Updated config saved to {config_path}")
 if __name__ == "__main__":
     main()

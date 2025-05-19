@@ -1,0 +1,23 @@
+model_type: "nllb"
+model_name_or_path: "facebook/nllb-200-distilled-600M"
+tokenizer_name: "facebook/nllb-200-distilled-600M"
+seed: 42
+
+src_lang_code: "eng_Latn"
+tgt_lang_code: "deu_Latn"
+
+train_file: "/home/mlt_ml2/ML_Applied_Project_2025S/Data/train.clean.jsonl"
+val_file: "/home/mlt_ml2/ML_Applied_Project_2025S/Data/val.clean.jsonl"
+
+source_lang: "en"
+target_lang: "de"
+
+max_source_length: 128
+max_target_length: 128
+
+learning_rate: 5e-5
+weight_decay: 0.01
+num_train_epochs: 4
+batch_size: 20
+
+output_dir: "outputs/nllb"
