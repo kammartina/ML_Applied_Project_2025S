@@ -5,7 +5,7 @@ from transformers import AutoModelForSeq2SeqLM, AutoTokenizer, Seq2SeqTrainer, S
 from transformers import set_seed
 import optuna
 from sacrebleu import corpus_bleu
-import math
+import datetime
 from tqdm import tqdm
 from functools import partial
 
@@ -60,10 +60,7 @@ def load_and_preprocess_data(config, tokenizer, fraction=0.01, max_train = 800, 
         train_dataset = raw_datasets["train"].select(range(max_train))
     if len(raw_datasets["validation"]) > max_valid:
         val_dataset = raw_datasets["validation"].select(range(max_valid))
-    #if len(dataset_dict["test"]) > max_test:
-        #dataset_dict["test"] = dataset_dict["test"].select(range(max_test))
-    #train_dataset = raw_datasets["train"].shuffle(seed=42).select(range(int(len(raw_datasets["train"]) * fraction)))
-    #val_dataset = raw_datasets["validation"].shuffle(seed=42).select(range(int(len(raw_datasets["validation"]) * fraction)))
+    
 
     print(f"Number of training examples: {len(train_dataset)}")
     print(f"Number of validation examples: {len(val_dataset)}")
@@ -97,8 +94,8 @@ def compute_metrics(eval_preds, tokenizer):
     decoded_labels = [[label.strip()] for label in decoded_labels]
 
 
-    print("Decoded Predictions:", decoded_preds[:5])  # Print first 5 predictions
-    print("Decoded Labels:", decoded_labels[:5]) 
+    #print("Decoded Predictions:", decoded_preds[:5])  # Print first 5 predictions
+    #print("Decoded Labels:", decoded_labels[:5]) 
 
     # Compute BLEU score
     bleu_score = corpus_bleu(decoded_preds, decoded_labels).score
@@ -106,58 +103,68 @@ def compute_metrics(eval_preds, tokenizer):
     return {"bleu": bleu_score}
 
 def objective(trial, model, tokenizer, tokenized_train, tokenized_val, data_collator):
-    # Sample hyperparameters
-    learning_rate = trial.suggest_float("learning_rate", 1e-5, 5e-4, log=True)
-    batch_size = trial.suggest_categorical("batch_size", [16])
-    num_train_epochs = trial.suggest_int("num_train_epochs", 3, 5)
+    try:
+        # Sample hyperparameters
+        learning_rate = trial.suggest_float("learning_rate", 1e-5, 5e-4, log=True)
+        batch_size = trial.suggest_categorical("batch_size", [10, 20])
+        num_train_epochs = trial.suggest_int("num_train_epochs", 3, 5)
 
-    # Log hyperparameters to WandB
-    #wandb.config.update({
-       # "learning_rate": learning_rate,
-       #"batch_size": batch_size,
-        #"num_train_epochs": num_train_epochs
-   # })
+        # Log hyperparameters to WandB
+        #wandb.config.update({
+        # "learning_rate": learning_rate,
+        #"batch_size": batch_size,
+            #"num_train_epochs": num_train_epochs
+    # })
 
-    training_args = Seq2SeqTrainingArguments(
-        output_dir=f"./optuna_trial_{trial.number}",
-        logging_dir=f"./logs/optuna_trial_{trial.number}",
-        eval_strategy="epoch",
-        save_strategy="epoch",
-        learning_rate=learning_rate,
-        per_device_train_batch_size=batch_size,
-        per_device_eval_batch_size=batch_size,
-        num_train_epochs=num_train_epochs,
-        logging_strategy="steps",
-        logging_steps=100,
-        report_to="tensorboard",
-        load_best_model_at_end=True,
-        predict_with_generate=True,
-        seed=224
-    )
+        training_args = Seq2SeqTrainingArguments(
+            output_dir=f"./optuna_trial_{trial.number}",
+            logging_dir=f"./logs/optuna_trial_{trial.number}",
+            eval_strategy="epoch",
+            save_strategy="epoch",
+            learning_rate=learning_rate,
+            per_device_train_batch_size=batch_size,
+            per_device_eval_batch_size=batch_size,
+            num_train_epochs=num_train_epochs,
+            logging_strategy="steps",
+            logging_steps=100,
+            report_to="tensorboard",
+            load_best_model_at_end=True,
+            predict_with_generate=True,
+            seed=224
+        )
 
-    trainer = Seq2SeqTrainer(
-        model=model,
-        args=training_args,
-        train_dataset=tokenized_train,
-        eval_dataset=tokenized_val,
-        tokenizer=tokenizer,
-        data_collator=data_collator,
-        compute_metrics=partial(compute_metrics, tokenizer=tokenizer) 
-    )
+        trainer = Seq2SeqTrainer(
+            model=model,
+            args=training_args,
+            train_dataset=tokenized_train,
+            eval_dataset=tokenized_val,
+            tokenizer=tokenizer,
+            data_collator=data_collator,
+            compute_metrics=partial(compute_metrics, tokenizer=tokenizer) 
+        )
 
-    for epoch in tqdm(range(num_train_epochs), desc="Training epochs"):     
-        print(f"Epoch {epoch + 1}/{num_train_epochs}")
-        # Train the model
+        #for epoch in tqdm(range(num_train_epochs), desc="Training epochs"):     
+            #print(f"Epoch {epoch + 1}/{num_train_epochs}")
+            # Train the model
         trainer.train()
-    # Log the checkpoint directory to WandB as an artifact
-    #artifact = wandb.Artifact("model-checkpoint", type="model")
-    #artifact.add_dir(f"./optuna_trial_{trial.number}")  # Add the checkpoint directory dynamically
-    #wandb.log_artifact(artifact)
+
+        # Evaluate and return BLEU score
+        eval_results = trainer.evaluate()
+        bleu_score = eval_results.get("eval_bleu", None)
+
+        if bleu_score is None:
+            raise ValueError("BLEU score is None. Evaluation failed.")
+
+        return bleu_score
+
+    except Exception as e:
+        print(f"Trial {trial.number} failed with exception: {e}")
+        return 0.0  # Return a default value to avoid trial failure
 
 def main():
     # Initialize WandB
     #wandb.init(project="ML for Translation Task", name="Model Training")
-    config_path = "/home/mlt_ml2/ML_Applied_Project_2025S/NMT_training_pipeline/configs/mbart50_config.yml"
+    config_path = "/home/mlt_ml2/ML_Applied_Project_2025S/NMT_training_pipeline/configs/t5_config.yml"
     print("Loading configurations:")
 
 
@@ -168,9 +175,10 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(config["tokenizer_name"])
     model = AutoModelForSeq2SeqLM.from_pretrained(config["model_name_or_path"])
 
-    tokenizer.src_lang = config["src_lang_code"]
-    tokenizer.tgt_lang = config["tgt_lang_code"]
-    model.config.forced_bos_token_id = tokenizer.convert_tokens_to_ids(config["tgt_lang_code"])
+    if config.get("model_type", "").lower().startswith("mbart"):
+        tokenizer.src_lang = config["src_lang_code"]
+        tokenizer.tgt_lang = config["tgt_lang_code"]
+        model.config.forced_bos_token_id = tokenizer.convert_tokens_to_ids(config["tgt_lang_code"])
 
     # Load and preprocess data
     tokenized_train, tokenized_val = load_and_preprocess_data(config, tokenizer)
@@ -194,7 +202,11 @@ def main():
     print("  Params:")
     for key, value in study.best_trial.params.items():
         print(f"    {key}: {value}")
-        config[key] = value    
+        config[key] = value  
+
+    # Add date/time and BLEU score to config
+    config["last_trained"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+    config["best_bleu_score"] = study.best_trial.value  
 
     with open(config_path, "w") as file:
         yaml.dump(config, file)
