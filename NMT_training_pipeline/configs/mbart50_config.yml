@@ -1,13 +1,13 @@
 model_type: "mbart"
-model_name_or_path: "facebook/mbart-large-50-one-to-many-mmt"
+model_name: "facebook/mbart-large-50-one-to-many-mmt"
 tokenizer_name: "facebook/mbart-large-50-one-to-many-mmt"
 seed: 42
 
 src_lang_code: "en_XX"
 tgt_lang_code: "de_DE"
 
-train_file: "/home/mlt_ml2/ML_Applied_Project_2025S/datasplit_json/train.clean.jsonl"
-val_file: "/home/mlt_ml2/ML_Applied_Project_2025S/datasplit_json/val.clean.jsonl"
+train_file: "/home/mlt_ml2/ML_Applied_Project_2025S/Data/train.clean.jsonl"
+val_file: "/home/mlt_ml2/ML_Applied_Project_2025S/Data/val.clean.jsonl"
 
 source_lang: "en"
 target_lang: "de"
@@ -15,4 +15,10 @@ target_lang: "de"
 max_source_length: 128
 max_target_length: 128
 
-output_dir: "outputs/mbart50"
+learning_rate: 5e-5
+weight_decay: 0.01
+num_train_epochs: 4
+batch_size: 20
+
+output_dir: "NMT_training_pipeline/outputs/mBart50"
+logging_dir: "NMT_training_pipeline/logs/mBart50"

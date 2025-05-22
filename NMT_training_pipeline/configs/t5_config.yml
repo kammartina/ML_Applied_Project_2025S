@@ -1,15 +1,21 @@
-batch_size: 10
-learning_rate: 1.855541896338685e-05
+model_type: "t5"
+model_name: "google-t5/t5-base"
+tokenizer_name: "google-t5/t5-base"
+seed: 42
+
+train_file: "/home/mlt_ml2/ML_Applied_Project_2025S/Data/train.clean.jsonl"
+val_file: "/home/mlt_ml2/ML_Applied_Project_2025S/Data/val.clean.jsonl"
+
+source_lang: "en"
+target_lang: "de"
+
 max_source_length: 128
 max_target_length: 128
-model_name_or_path: google-t5/t5-base
-model_type: t5
+
+learning_rate: 5e-5
+weight_decay: 0.01
 num_train_epochs: 4
-output_dir: results/t5
-prefix: 'translate English to German: '
-seed: 42
-source_lang: en
-target_lang: de
-tokenizer_name: google-t5/t5-base
-train_file: /home/mlt_ml2/ML_Applied_Project_2025S/datasplit_json/train.clean.jsonl
-val_file: /home/mlt_ml2/ML_Applied_Project_2025S/datasplit_json/val.clean.jsonl
+batch_size: 20
+
+output_dir: "NMT_training_pipeline/outputs/t5"
+logging_dir: "NMT_training_pipeline/logs/t5"

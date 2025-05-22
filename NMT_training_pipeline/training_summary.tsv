@@ -1,0 +1,4 @@
+model	                                train_time	    train_loss      bleu_score   learning_rate	batch_size	num_epochs	weight_decay
+facebook/nllb-200-distilled-600M        03:10           2.27            15.11        5e-05          20          4           0.01        
+google-t5/t5-base                       01:11           1.95            16.52        5e-05          20          4           0.01        
+facebook/mbart-large-50-one-to-many-mmt 03:16           1.99            15.11        5e-05          20          4           0.01        

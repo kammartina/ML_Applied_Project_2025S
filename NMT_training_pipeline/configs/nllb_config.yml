@@ -1,5 +1,5 @@
 model_type: "nllb"
-model_name_or_path: "facebook/nllb-200-distilled-600M"
+model_name: "facebook/nllb-200-distilled-600M"
 tokenizer_name: "facebook/nllb-200-distilled-600M"
 seed: 42
 
@@ -20,4 +20,5 @@ weight_decay: 0.01
 num_train_epochs: 4
 batch_size: 20
 
-output_dir: "outputs/nllb"
+output_dir: "NMT_training_pipeline/outputs/nllb"
+logging_dir: "NMT_training_pipeline/logs/nllb"
