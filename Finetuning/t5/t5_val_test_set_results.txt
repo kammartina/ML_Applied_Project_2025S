@@ -1,0 +1,62 @@
+### These are results of testing each of the finetuned t5 models on the test set split, always with 512 test samples.
+----------------------
+1. 
+t5_base_en-de_finetuned(32K)
+----------------------
+Validation results:
+-- I forgot to track these results --
+
+Test results:
+ {'eval_loss': 1.7099956274032593, 
+  'eval_model_preparation_time': 0.0051, 
+  'eval_bleu': 22.0863, 
+  'eval_gen_len': 25.625, 
+  'eval_runtime': 26.3846, 
+  'eval_samples_per_second': 19.405, 
+  'eval_steps_per_second': 1.213}
+
+
+
+----------------------
+2. 
+t5_base_en-de_finetuned(32K)_cleaned_dataset
+----------------------
+Validation results:
+{'test_loss': 1.6694741249084473,
+ 'test_bleu': 22.3576,
+ 'test_gen_len': 24.6875,
+ 'test_runtime': 26.7633,
+ 'test _samples_per_second': 19.131,
+ 'test_steps_per_second': 1.196}
+
+Test results:
+ {'eval_loss': 1.579579472541809, 
+  'eval_model_preparation_time': 0.0052, 
+  'eval_bleu': 24.2424, 
+  'eval_gen_len': 25.875, 
+  'eval_runtime': 28.4713, 
+  'eval_samples_per_second': 17.983, 
+  'eval_steps_per_second': 1.124}
+
+
+
+----------------------
+3. 
+t5_base_en-fr_finetuned(32K)_cleaned_dataset
+----------------------
+Validation results:
+{'test_loss': 1.1950327157974243,
+ 'test_bleu': 32.6918,
+ 'test_gen_len': 30.4688,
+ 'test_runtime': 29.7915,
+ 'test_samples per_second': 17.186,
+ 'test_steps per_second': 1.074}
+
+Test results:
+ {'eval_loss': 1.3253144025802612, 
+  'eval_model_preparation_time': 0.0052, 
+  'eval_bleu': 27.9185, 
+  'eval_gen_len': 34.0938, 
+  'eval_runtime': 35.9594, 
+  'eval_samples_per_second': 14.238, 
+  'eval_steps_per_second': 0.89}

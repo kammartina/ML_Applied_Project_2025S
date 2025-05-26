@@ -1,0 +1,65 @@
+### These are results of testing each of the finetuned nllb models on the test set split, always with 512 test samples.
+----------------------
+1. 
+nllb_en-de_finetuned(32K)
+----------------------
+Validation results:
+{'test_loss': 0.705388069152832, 
+ 'test_sacrebleu': 21.366065417680694, 
+ 'test_chrf': 45.79612563428759, 
+ 'test_runtime': 24.1698, 
+ 'test_samples_per_second': 21.183, 
+ 'test_steps_per_second': 1.324}
+
+Test results:
+{'eval_loss': 0.7935734391212463, 
+ 'eval_model_preparation_time': 0.006, 
+ 'eval_sacrebleu': 23.25238160521439, 
+ 'eval_chrf': 46.57877856170928, 
+ 'eval_runtime': 22.9581, 
+ 'eval_samples_per_second': 22.302, 
+ 'eval_steps_per_second': 1.394}
+
+----------------------
+2. 
+nllb_en-de_finetuned(32K)_cleaned_dataset
+----------------------
+Validation results:
+{'test_loss': 0.7206302285194397, 
+'test_sacrebleu': 22.799425272001375, 
+'test_chrf': 46.836292856784056, 
+'test_runtime': 22.39, 
+'test_samples_per_second': 22.867, 
+'test_steps_per_second': 1.429}
+
+Test results:
+{'eval_loss': 0.7263513207435608, 
+ 'eval_model_preparation_time': 0.0058, 
+ 'eval_sacrebleu': 25.199590318925576, 
+ 'eval_chrf': 49.433325214598106, 
+ 'eval_runtime': 22.9602, 
+ 'eval_samples_per_second': 22.299, 
+ 'eval_steps_per_second': 1.394}
+
+
+----------------------
+3. 
+nllb_en-fr_finetuned(32K)_cleaned_dataset
+----------------------
+Validation results:
+{'test_loss': 0.9140143394470215, 
+ 'test_model_preparation_time': 0.0056, 
+ 'test_sacrebleu': 1.0275933096614676, 
+ 'test_chrf': 15.066150447584217, 
+ 'test_runtime': 28.4553, 
+ 'test_samples_per_second': 17.993, 
+ 'test_steps_per_second': 1.125}
+
+Test results:
+{'eval_loss': 0.579248309135437, 
+ 'eval_model_preparation_time': 0.0056, 
+ 'eval_sacrebleu': 32.33813227420938, 
+ 'eval_chrf': 53.44186240157883, 
+ 'eval_runtime': 22.9247, 
+ 'eval_samples_per_second': 22.334, 
+ 'eval_steps_per_second': 1.396}

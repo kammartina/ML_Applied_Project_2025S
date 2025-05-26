@@ -1,5 +1,8 @@
-########## T5-base model fine-tuning for ENGLISH to GERMAN Translation ##########
-# This script was run in the Google Colab environment.
+"""
+Finetuning pretrained T5-base model for translation from English to French
+
+The finetuning was done in Google Colab. 
+"""
 
 """
 !pip install datasets evaluate transformers[sentencepiece]
@@ -7,15 +10,16 @@
 """
 
 # Import necessary libraries
-#import torch
+from pprint import pprint
+import torch
 import os
 import json
 import random
 import evaluate
 import numpy as np
 
-from pprint import pprint
 from datasets import Dataset, DatasetDict, load_dataset
+
 from transformers import (
     T5Tokenizer,
     T5ForConditionalGeneration,
@@ -32,9 +36,11 @@ drive.mount('/content/drive', force_remount=True)
 
 # Define paths for each split
 # the splits were uploaded into the Colab
-train_path = "train.clean.jsonl"
-val_path = "val.clean.jsonl"
-test_path = "test.clean.jsonl"
+train_path = "/content/train.clean.jsonl"
+val_path = "/content/val.clean.jsonl"
+test_path = "/content/test.clean.jsonl"
+
+# !pip install --upgrade datasets
 
 # --------------------------
 # Load the dataset splits
@@ -42,7 +48,6 @@ test_path = "test.clean.jsonl"
 train_data = load_dataset("json", data_files=train_path)
 val_data = load_dataset("json", data_files=val_path)
 test_data = load_dataset("json", data_files=test_path)
-
 
 # --------------------------
 # Create DatasetDict
@@ -130,6 +135,7 @@ print("\n...after mapping:")
 print(tokenized_dataset["train"][0]["input_ids"][:10])
 print(tokenizer.decode(tokenized_dataset["train"][0]["input_ids"][:20]))
 
+
 # --------------------------
 # Evaluation Metrics: SACREBLEU
 # --------------------------
@@ -165,25 +171,26 @@ def compute_metrics(eval_preds):
     result = {k: round(v, 4) for k, v in result.items()}
     return result
 
+
 # --------------------------
 # Training Arguments and Trainer Setup
 # --------------------------
 training_args = Seq2SeqTrainingArguments(
     output_dir=os.path.join("/content/drive/MyDrive/ML2_Bublin_Project/Martina_T5/t5_base_en-de_finetuned(32K)_cleaned_dataset"),  # Where to store model checkpoints and outputs
-    num_train_epochs=4,                  # Total number of training epochs
-    per_device_train_batch_size=16,      # Batch size per device during training
-    per_device_eval_batch_size=16,       # Batch size per device during evaluation
-    eval_strategy="epoch",               # Evaluate at the end of every epoch
+    num_train_epochs=4,                  # Total number of training epochs; adjust as needed
+    per_device_train_batch_size=16,       # Batch size per device during training
+    per_device_eval_batch_size=16,        # Batch size per device during evaluation
+    eval_strategy="epoch",         # Evaluate at the end of every epoch
     save_strategy="epoch",               # Save checkpoint after each epoch
-    #logging_steps=100,                  # Log training metrics every 100 steps
+    #logging_steps=100,                   # Log training metrics every 100 steps
     learning_rate=2e-5,                  # Learning rate; you can experiment with different values
     weight_decay=0.01,                   # Weight decay for optimization
     fp16=True,                           # Enable mixed-precision training if you have a compatible GPU
     report_to="none",                    # Disables W&B logging
     load_best_model_at_end=True,         # Load the best model at the end of training
     predict_with_generate=True,          # Use generate() for evaluation to compute metrics like BLEU if desired
-    generation_max_length=250,           # Maximum length of generated sequences
-    generation_num_beams=5,              # Number of beams for beam search during generation
+    generation_max_length=250,            # Maximum length of generated sequences
+    generation_num_beams=5,               # Number of beams for beam search during generation
 )
 
 # Initialize the data collator for dynamic padding during training
@@ -191,12 +198,12 @@ data_collator = DataCollatorForSeq2Seq(tokenizer, model=model)
 
 # Initialize the Trainer
 trainer = Seq2SeqTrainer(
-    model=model,                                    # My T5 model loaded and adjusted earlier
-    args=training_args,                             # Training arguments defined above
-    train_dataset=tokenized_dataset["train"],       # Tokenized training dataset
+    model=model,                                # Your T5 model loaded and adjusted earlier
+    args=training_args,                         # Training arguments defined above
+    train_dataset=tokenized_dataset["train"],   # Tokenized training dataset
     eval_dataset=tokenized_dataset["validation"],   # Tokenized validation dataset
-    tokenizer=tokenizer,                            # The tokenizer to use (with special tokens added)
-    data_collator=data_collator,                    # Collator to handle batching and padding
+    tokenizer=tokenizer,                        # The tokenizer to use (with special tokens added)
+    data_collator=data_collator,                # Collator to handle batching and padding
     compute_metrics=compute_metrics
 )
 
@@ -205,34 +212,43 @@ trainer = Seq2SeqTrainer(
 # --------------------------
 trainer.train()
 
+
 # --------------------------
 # Evaluate on Validation Set
 # --------------------------
 val_results = trainer.predict(tokenized_dataset['validation'])
 print(val_results)
 
+
 # --------------------------
 # Evaluate on Test Set
 # --------------------------
-#model_path = "/content/drive/MyDrive/ML2_Bublin_Project/Martina_T5/t5_base_finetuned(32K)/checkpoint-6000"
-#model_finetuned = .from_pretrained(model_path)
+# Define the local path where you uploaded the model checkpoint files
+model_path_test = "/content/drive/MyDrive/ML2_Bublin_Project/Martina_T5/t5_base_en-de_finetuned(32K)_cleaned_dataset/checkpoint-8000"
 
-# BEARBEITEN
-"""
-trainer_test = Trainer(
-    model=model_finetuned, # we give our model, our arguments and out dataset to the class Trainer
-    args=training_args, # these are our parameters we set
-    eval_dataset=tokenized_dataset['test'], # change to test when you do your final evaluation!
-    processing_class=tokenizer,
-    data_collator=data_collator, # processing method
-    compute_metrics=compute_metrics # how the evaluation metrics is supposed to be computed
-)
-"""
-# test_results = trainer_test.evaluate(eval_dataset=tokenized_dataset["test"])
-# print("Test results:", test_results)
+# Ensure the necessary files (config.json, model.safetensors, etc.) are in this directory
+try:
+    model_finetuned = T5ForConditionalGeneration.from_pretrained(model_path_test)
+    print("Model loaded successfully from local path.")
 
-# --------------------------
-# Save the Fine-Tuned Model
-# --------------------------
-#output_finetuned = os.path.join("/content/drive/MyDrive/ML2_Bublin_Project/Martina_T5/t5_base_finetuned(32K)/epoch_3")
-#trainer.save_model("/content/t5_base_translation/checkpoint-6000") # choose the checkpoint
+    # Initialize the data collator for dynamic padding during training
+    data_collator = DataCollatorForSeq2Seq(tokenizer, model=model_finetuned)
+
+    # Initialize the Trainer for evaluation
+    trainer_test = Seq2SeqTrainer(
+        model=model_finetuned,                      # T5 model loaded from the local checkpoint
+        args=training_args,                         # Training arguments defined above
+        eval_dataset=tokenized_dataset["test"],     # Tokenized test dataset
+        tokenizer=tokenizer,                        # The tokenizer to use
+        data_collator=data_collator,                # Collator to handle batching and padding
+        compute_metrics=compute_metrics             # Your defined evaluation metrics
+    )
+
+    # Evaluate the model on the test dataset
+    print("\nStarting evaluation on test set...")
+    test_results = trainer_test.evaluate(eval_dataset=tokenized_dataset["test"])
+    print("Test results:\n", test_results)
+
+except OSError as e:
+    print(f"Error loading model: {e}")
+    print("Please ensure 'config.json', 'model.safetensors' (or 'pytorch_model.bin'), and 'generation_config.json' are directly in the specified local path.")

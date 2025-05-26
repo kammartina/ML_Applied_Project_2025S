@@ -95,11 +95,46 @@ def save_model_results(model_name, source_texts, translations, references, bleu_
             f.write(f"{src:<{col_width}}{trans:<{col_width}}{ref:<{col_width}}\n")
         f.write(f"BLEU score: {bleu_score}\n")
 
+def save_bleu_score(tsv_file, source_column, target_column, models, line_counts, bleu_file, translations_file, device=0):
+    max_line_count = max(line_counts)
+    # Clear files before writing
+    open(bleu_file, "w").close()
+    open(translations_file, "w").close()
+    # Set column widths
+    col_widths = [8, 45, 12]  # lines, model, bleu_score
+    header_fmt = f"{{:<{col_widths[0]}}}{{:<{col_widths[1]}}}{{:<{col_widths[2]}}}\n"
+    row_fmt = f"{{:<{col_widths[0]}}}{{:<{col_widths[1]}}}{{:<{col_widths[2]}.2f}}\n"
+    with open(bleu_file, "w", encoding="utf-8") as bf:
+        bf.write(header_fmt.format("lines", "model", "bleu_score"))
+    #for num_lines in line_counts:
+    source_texts, references = extract_source_reference(tsv_file, source_column, target_column, num_sentences=max_line_count)
+    for model_name, model_type, src_code, tgt_code in models:
+        print(f"Translating {max_line_count} lines with {model_name}...")
+        translations = translate_sentences(
+            source_texts,
+            model_name,
+            model_type=model_type,
+            source_lang_code=src_code,
+            target_lang_code=tgt_code,
+            device=device
+        )
+        for line_count in line_counts: 
+            bleu = sacrebleu.corpus_bleu(translations[:line_count], [references[:line_count]])
+            print(f"BLEU score for {model_name} ({line_count} lines): {bleu.score}")
+            # Save BLEU score
+            with open(bleu_file, "a", encoding="utf-8") as bf:
+                bf.write(row_fmt.format(line_count, model_name, bleu.score))
+            # Save translations only for the max line count
+            if line_count == max_line_count:
+                save_model_results(model_name, source_texts, translations, references, bleu.score, translations_file)
+
+
 def main():
     tsv_file = "/home/mlt_ml2/ML_Applied_Project_2025S/Data/train.clean.en-de.tsv"
     source_column = "en"
     target_column = "de"
-    output_file = "/home/mlt_ml2/ML_Applied_Project_2025S/Model_Selektion/translation_pipeline_100L_summary.tsv"
+    translations_file = "/home/mlt_ml2/ML_Applied_Project_2025S/Model_Exploration/translation_pipeline_output.tsv"
+    bleu_file = "/home/mlt_ml2/ML_Applied_Project_2025S/Model_Exploration/model_comparison.tsv"
     models = [
         ("google-t5/t5-base", "t5", "en", "de"),
         ("Helsinki-NLP/opus-mt-en-de", "marian", "en", "de"),
@@ -110,20 +145,22 @@ def main():
         ("facebook/m2m100_418M", "m2m100", "en", "de")
     ]
      
-    source_texts, references = extract_source_reference(tsv_file, source_column, target_column, num_sentences=100)
-    for model_name, model_type, src_code, tgt_code in models:
-        print(f"Translating with {model_name}...")
-        translations = translate_sentences(
-            source_texts,
-            model_name,
-            model_type=model_type,
-            source_lang_code=src_code,
-            target_lang_code=tgt_code,
-            device=0
-        )
-        bleu = sacrebleu.corpus_bleu(translations, [references])
-        print(f"BLEU score for {model_name}: {bleu.score}")
-        save_model_results(model_name, source_texts, translations, references, bleu.score, output_file)
+    #source_texts, references = extract_source_reference(tsv_file, source_column, target_column, num_sentences=200)
+    #for model_name, model_type, src_code, tgt_code in models:
+        #print(f"Translating with {model_name}...")
+        #translations = translate_sentences(
+            #source_texts,
+            #model_name,
+            #model_type=model_type,
+            #source_lang_code=src_code,
+            #target_lang_code=tgt_code,
+            #device=0
+        #)
+        #bleu = sacrebleu.corpus_bleu(translations, [references])
+        #print(f"BLEU score for {model_name}: {bleu.score}")
+        #save_model_results(model_name, source_texts, translations, references, bleu.score, output_file)
+    line_counts = [10, 100, 200]
+    save_bleu_score(tsv_file, source_column, target_column, models, line_counts, bleu_file, translations_file, device=0)
     
 if __name__ == "__main__":
     main()
