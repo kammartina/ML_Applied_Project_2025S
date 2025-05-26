@@ -40,7 +40,7 @@ def get_train_val_datasets(train_file, val_file, fraction=0.01, max_train=800, m
     print(f"Number of validation examples: {len(val_dataset)}")
     return train_dataset, val_dataset
 
-def preprocess_and_tokenize(dataset, model_type, tokenizer, src_lang, tgt_lang, max_src_length, max_tgt_length, desc="Tokenizing dataset"):
+def preprocess_and_tokenize(dataset, model_type, tokenizer, src_lang, tgt_lang, prefix, max_src_length, max_tgt_length, desc="Tokenizing dataset"):
     """Preprocess and tokenize a dataset."""
     def preprocess_function(examples):
         inputs, targets = [], []
@@ -49,7 +49,7 @@ def preprocess_and_tokenize(dataset, model_type, tokenizer, src_lang, tgt_lang, 
             tgt = item.get(tgt_lang)
             if src and tgt:
                 if model_type == "t5":
-                    input_text = f"translate {src_lang} to {tgt_lang}: {src}"
+                    input_text = f"{prefix}: {src}"
                     inputs.append(input_text)
                     targets.append(tgt)
                 else:
@@ -88,19 +88,7 @@ def compute_metrics(eval_preds, tokenizer):
 
     return {"bleu": bleu_score}
 
-#def objective(trial, model, tokenizer, tokenized_train, tokenized_val, data_collator):
-    #try:
-        # Sample hyperparameters
-        #learning_rate = trial.suggest_float("learning_rate", 1e-5, 5e-4, log=True)
-        #batch_size = trial.suggest_categorical("batch_size", [10, 20])
-        #num_train_epochs = trial.suggest_int("num_train_epochs", 3, 5)
 
-        # Log hyperparameters to WandB
-        #wandb.config.update({
-        # "learning_rate": learning_rate,
-        #"batch_size": batch_size,
-            #"num_train_epochs": num_train_epochs
-    # })
 def train(model, tokenizer, output_dir, logging_dir, tokenized_train, tokenized_val, data_collator, learning_rate, weight_decay, batch_size, num_epochs, seed = 224):
     training_args = Seq2SeqTrainingArguments(
         output_dir=output_dir,
@@ -145,7 +133,7 @@ def main():
     # Initialize WandB
     #wandb.init(project="ML for Translation Task", name="Model Training")
     summary_path = "NMT_training_pipeline/training_summary.tsv"
-    config_path = "NMT_training_pipeline/configs/mbart50_config.yml"
+    config_path = "NMT_training_pipeline/configs/mT5_config.yml"
     print("Loading configurations:")
 
 
@@ -160,6 +148,7 @@ def main():
     tgt_lang_code = config.get("tgt_lang_code", "")
     src_lang = config['source_lang']
     tgt_lang = config['target_lang']
+    prefix = config.get("prefix", "")
     max_src_length = config["max_source_length"]
     max_tgt_length = config["max_target_length"]
     train_file = config["train_file"]
@@ -176,8 +165,8 @@ def main():
 
     # Load and preprocess data
     train_dataset, val_dataset = get_train_val_datasets(train_file, val_file)
-    tokenized_train = preprocess_and_tokenize(train_dataset, model_type, tokenizer, src_lang, tgt_lang, max_src_length, max_tgt_length, desc="Tokenizing train dataset")
-    tokenized_val = preprocess_and_tokenize(val_dataset, model_type, tokenizer, src_lang, tgt_lang, max_src_length, max_tgt_length, desc="Tokenizing validation dataset")
+    tokenized_train = preprocess_and_tokenize(train_dataset, model_type, tokenizer, src_lang, tgt_lang, prefix, max_src_length, max_tgt_length, desc="Tokenizing train dataset")
+    tokenized_val = preprocess_and_tokenize(val_dataset, model_type, tokenizer, src_lang, tgt_lang, prefix, max_src_length, max_tgt_length, desc="Tokenizing validation dataset")
 
     # Data collator
     data_collator = DataCollatorForSeq2Seq(tokenizer=tokenizer, model=model)
@@ -186,23 +175,7 @@ def main():
     batch_size = int(config["batch_size"])
     num_epochs = int(config["num_train_epochs"])
 
-    #study = optuna.create_study(direction="maximize")  # Maximize BLEU score
-    #study.optimize((partial(
-        #objective,
-        #model=model,
-        #tokenizer=tokenizer,
-        #tokenized_train=tokenized_train,
-        #tokenized_val=tokenized_val,
-        #data_collator=data_collator
-    #)), n_trials=2)  # Run 2 trials
-
-    # Print the best trial
-    #print("Best trial:")
-    #print(f" Value: {study.best_trial.value}")
-    #print("  Params:")
-    #for key, value in study.best_trial.params.items():
-       # print(f"    {key}: {value}")
-        #config[key] = value  
+    # Train the model
     start_time = time.time()
     bleu_score, train_loss = train(
         model, 
@@ -244,6 +217,8 @@ def main():
                 )
             f.write(header)
         f.write(row)
+    print("Training summary written to:", summary_path)
+    print("Training completed.")
     
     
   

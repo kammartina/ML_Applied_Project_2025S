@@ -1,6 +1,6 @@
 model_type: "t5"
-model_name: "google-t5/t5-base"
-tokenizer_name: "google-t5/t5-base"
+model_name: "google/mt5-base"
+tokenizer_name: "google/mt5-base"
 seed: 42
 
 train_file: "/home/mlt_ml2/ML_Applied_Project_2025S/Data/train.clean.jsonl"
@@ -18,5 +18,5 @@ weight_decay: 0.01
 num_train_epochs: 4
 batch_size: 20
 
-output_dir: "NMT_training_pipeline/outputs/t5"
-logging_dir: "NMT_training_pipeline/logs/t5"
+output_dir: "NMT_training_pipeline/outputs/mT5"
+logging_dir: "NMT_training_pipeline/logs/mT5"
