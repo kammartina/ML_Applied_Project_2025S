@@ -175,7 +175,7 @@ cython_debug/
 
 
 # ignore folders
-/home/mlt_ml2/ML_Applied_Project_2025S/bicleaner-env
-/home/mlt_ml2/ML_Applied_Project_2025S/datasplit_json/ted_aligned_en_de.json.zip
+bicleaner-env/
+Data/ted_aligned_en_de.json.zip
 venv
 /home/mlt_ml2/ML_Applied_Project_2025S/Finetuning/t5/t5_base_en-de_finetuned(32K)
