@@ -181,4 +181,5 @@ Model_Exploration/translation_pipeline_100L_summary.tsv
 bicleaner-env/
 Data/ted_aligned_en_de.json.zip
 venv
+Finetuning/nllb
 /home/mlt_ml2/ML_Applied_Project_2025S/Finetuning/t5/t5_base_en-de_finetuned(32K)
