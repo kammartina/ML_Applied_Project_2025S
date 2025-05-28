@@ -183,4 +183,5 @@ Data/ted_aligned_en_de.json.zip
 venv
 Finetuning/nllb
 NMT_training_pipeline/outputs
-/home/mlt_ml2/ML_Applied_Project_2025S/Finetuning/t5/t5_base_en-de_finetuned(32K)
+Finetuning/t5/t5_base_en-de_finetuned(32K)
+Finetuning/mT5
