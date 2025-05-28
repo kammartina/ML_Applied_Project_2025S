@@ -173,6 +173,9 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 
+# Ignore files
+Model_Exploration/translation_pipeline_10L_summary.tsv
+Model_Exploration/translation_pipeline_100L_summary.tsv
 
 # ignore folders
 bicleaner-env/
