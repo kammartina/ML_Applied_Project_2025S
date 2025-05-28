@@ -65,7 +65,7 @@ def translate_sentences(
             print(translation[0]['translation_text'])
             translations.append(translation[0]['translation_text'])
     elif model_type.lower() in ["mbart", "marian", "m2m100", "nllb"]:
-        # For mBART/MarianMT, use src_lang and tgt_lang
+        # For mBART/MarianMT/nllb/m2m100, use src_lang and tgt_lang
         translator = pipeline("translation", model=model_name, device=device)
         for text in tqdm(source_texts, desc="Translating"):
             translation = translator(text, src_lang=source_lang_code, tgt_lang=target_lang_code)

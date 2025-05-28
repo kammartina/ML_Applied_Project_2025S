@@ -1,7 +1,9 @@
 model_type: "t5"
 model_name: "google-t5/t5-base"
-tokenizer_name: "google-t5/t5-base"
 seed: 42
+
+train_dir: "/home/mlt_ml2/ML_Applied_Project_2025S/Data/chunk_files/"
+val_dir: "/home/mlt_ml2/ML_Applied_Project_2025S/Data/chunk_files/"
 
 train_file: "/home/mlt_ml2/ML_Applied_Project_2025S/Data/train.clean.jsonl"
 val_file: "/home/mlt_ml2/ML_Applied_Project_2025S/Data/val.clean.jsonl"

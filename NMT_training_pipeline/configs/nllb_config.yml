@@ -1,6 +1,5 @@
 model_type: "nllb"
 model_name: "facebook/nllb-200-distilled-600M"
-tokenizer_name: "facebook/nllb-200-distilled-600M"
 seed: 42
 
 src_lang_code: "eng_Latn"

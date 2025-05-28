@@ -1,6 +1,5 @@
 model_type: "mbart"
 model_name: "facebook/mbart-large-50-one-to-many-mmt"
-tokenizer_name: "facebook/mbart-large-50-one-to-many-mmt"
 seed: 42
 
 src_lang_code: "en_XX"
