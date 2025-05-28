@@ -16,7 +16,8 @@ def extract_source_reference(tsv_file, source_lang, target_lang, num_sentences=1
         list: List of source sentences and target sentences as references for evaluation.
     """
     # Load the TSV file
-    parallel_data = pd.read_csv(tsv_file, sep="\t", names=[f"{source_lang}", f"{target_lang}"])
+    parallel_data = pd.read_csv(tsv_file, sep="\t", names=[f"{source_lang}", f"{target_lang}"], usecols=[0,1])
+    parallel_data = parallel_data.dropna()
     # Check if the file is empty
     if parallel_data.empty:
         raise ValueError("The TSV file is empty or not formatted correctly.")
@@ -62,14 +63,14 @@ def translate_sentences(
         translator = pipeline(task, model=model_name, device=device)
         for text in tqdm(source_texts, desc="Translating"):
             translation = translator(text)
-            print(translation[0]['translation_text'])
+            #print(translation[0]['translation_text'])
             translations.append(translation[0]['translation_text'])
     elif model_type.lower() in ["mbart", "marian", "m2m100", "nllb"]:
         # For mBART/MarianMT/nllb/m2m100, use src_lang and tgt_lang
         translator = pipeline("translation", model=model_name, device=device)
         for text in tqdm(source_texts, desc="Translating"):
             translation = translator(text, src_lang=source_lang_code, tgt_lang=target_lang_code)
-            print(translation[0]['translation_text'])
+            #print(translation[0]['translation_text'])
             translations.append(translation[0]['translation_text'])
     else:
         # Default: try pipeline with just the model
@@ -130,11 +131,11 @@ def save_bleu_score(tsv_file, source_column, target_column, models, line_counts,
 
 
 def main():
-    tsv_file = "/home/mlt_ml2/ML_Applied_Project_2025S/Data/train.clean.en-de.tsv"
+    tsv_file = "Data/test.tsv"
     source_column = "en"
     target_column = "de"
-    translations_file = "/home/mlt_ml2/ML_Applied_Project_2025S/Model_Exploration/translation_pipeline_output.tsv"
-    bleu_file = "/home/mlt_ml2/ML_Applied_Project_2025S/Model_Exploration/model_comparison.tsv"
+    translations_file = "/home/mlt_ml2/ML_Applied_Project_2025S/Model_Exploration/translation_output.tsv"
+    bleu_file = "/home/mlt_ml2/ML_Applied_Project_2025S/Model_Exploration/model_scores.tsv"
     models = [
         ("google-t5/t5-base", "t5", "en", "de"),
         ("Helsinki-NLP/opus-mt-en-de", "marian", "en", "de"),
