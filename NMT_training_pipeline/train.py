@@ -13,11 +13,13 @@ import yaml
 from datasets import load_dataset
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer, Seq2SeqTrainer, Seq2SeqTrainingArguments, DataCollatorForSeq2Seq, EarlyStoppingCallback
 from transformers import set_seed
-from sacrebleu import corpus_bleu
+import evaluate
+metric = evaluate.load("sacrebleu")
 import time
 from functools import partial
 import glob
 import numpy as np
+import math
 
 def load_config(config_path):
     """Load configuration from a YAML file."""
@@ -52,25 +54,22 @@ def get_train_val_datasets(train_file, val_file, max_train=None, max_valid=None,
     print(f"Number of validation examples: {len(val_dataset)}")
     return train_dataset, val_dataset
 
-def preprocess_and_tokenize(dataset, model_type, tokenizer, src_lang, tgt_lang, prefix, max_src_length, max_tgt_length, desc="Tokenizing dataset"):
+def preprocess_and_tokenize(dataset, tokenizer, src_lang, tgt_lang, prefix, max_src_length, max_tgt_length, desc="Tokenizing dataset"):
     """Preprocess and tokenize a dataset."""
     def preprocess_function(examples):
-        inputs, targets = [], []
-        for item in examples["translation"]:
-            src = item.get(src_lang)
-            tgt = item.get(tgt_lang)
-            if src and tgt:
-                if model_type == "t5":
-                    input_text = f"{prefix}{src}"
-                    inputs.append(input_text)
-                    targets.append(tgt)
-                else:
-                    inputs.append(src)
-                    targets.append(tgt)
+        inputs = [ex[src_lang] for ex in examples["translation"]]
+        targets = [ex[tgt_lang] for ex in examples["translation"]]
+        if prefix:
+            inputs = [prefix + inp for inp in inputs]
         model_inputs = tokenizer(inputs, max_length=max_src_length, padding=True, truncation=True)
-        labels = tokenizer(targets, max_length=max_tgt_length, padding=True, truncation=True)
-        labels_ids = [[(token if token != tokenizer.pad_token_id else -100) for token in label] for label in labels["input_ids"]]
-        model_inputs["labels"] = labels_ids
+        labels = tokenizer(text_target=targets, max_length=max_tgt_length, padding=True, truncation=True)
+        # 
+        if tokenizer.pad_token_id is not None:
+            labels["input_ids"] = [
+                [(l if l != tokenizer.pad_token_id else -100) for l in label] for label in labels["input_ids"]
+            ]
+
+        model_inputs["labels"] = labels["input_ids"]
         return model_inputs
 
     return dataset.map(
@@ -82,66 +81,70 @@ def preprocess_and_tokenize(dataset, model_type, tokenizer, src_lang, tgt_lang, 
 
 
 def compute_metrics(eval_preds, tokenizer):
-    """Compute BLEU score for predictions."""
     preds, labels = eval_preds
-    #vocab_size = getattr(tokenizer, "vocab_size", 32000)
-    # Convert all tokens to Python int to avoid np.int64 issues
-    #preds = [[int(token) for token in pred] for pred in preds]
-    #labels = [[int(token) for token in label] for label in labels]
-    #preds = [[int(token) if isinstance(token, (int, float)) and 0 <= int(token) < vocab_size else tokenizer.pad_token_id for token in pred] for pred in preds]
-    #labels = [[int(token) if isinstance(token, (int, float)) and 0 <= int(token) < vocab_size else tokenizer.pad_token_id for token in label] for label in labels]
     if isinstance(preds, tuple):
         preds = preds[0]
-    if isinstance(labels, tuple):
-        labels = labels[0]
-    
-    if hasattr(preds, "cpu"):
-        preds = preds.cpu().numpy()
-    if hasattr(labels, "cpu"):
-        labels = labels.cpu().numpy()
 
-    # Ensure preds are integers only
-    preds = np.array(preds).astype(np.int32)
-    labels = np.array(labels).astype(np.int32)
+    ### Ensure the predictions are within the vocabulary size
+    # It clips (limits) the values in the preds array to be within the valid range of token IDs for the tokenizer's vocabulary.
+    num_clipped = np.sum(preds > tokenizer.vocab_size - 1)
+    print(f"Number of clipped tokens: {num_clipped}")
     
-    print("Sample preds:", preds[:2])
-    print("Sample labels:", labels[:2])
-    # ... rest of your code ...
-    
-    # Replace -100 in the labels as we can't decode them
-    labels = [[token if token != -100 else tokenizer.pad_token_id for token in label] for label in labels]
-    # Decode predictions and labels
-    
+    max_token_id = max(tokenizer.get_vocab().values())
+    preds = np.clip(preds, 0, max_token_id)
+
+    labels = np.where(labels != -100, labels, tokenizer.pad_token_id)
     decoded_preds = tokenizer.batch_decode(preds, skip_special_tokens=True)
     decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
 
-    
     decoded_preds = [pred.strip() for pred in decoded_preds]
     decoded_labels = [[label.strip()] for label in decoded_labels]
 
-    # Compute BLEU score
-    bleu_score = corpus_bleu(decoded_preds, decoded_labels).score
+    result = metric.compute(predictions=decoded_preds, references=decoded_labels)
+    result = {"bleu": result["score"]}
 
-    return {"bleu": bleu_score}
+    prediction_lens = [np.count_nonzero(pred != tokenizer.pad_token_id) for pred in preds]
+    result["gen_len"] = np.mean(prediction_lens)
+    result = {k: round(v, 4) for k, v in result.items()}
+    return result
+
 
 
 def train(model, tokenizer, output_dir, logging_dir, tokenized_train, tokenized_val, 
-          data_collator, learning_rate, weight_decay, batch_size, num_epochs, seed=224, **kwargs):
+          data_collator, learning_rate, weight_decay, batch_size, num_epochs, seed=224, callbacks=None, early_stopping=False, early_stopping_patience=1, **kwargs):
     
     warmup_steps=kwargs.get("warmup_steps", 0)
     max_length=kwargs.get("max_length", None)
     num_beams=kwargs.get("num_beams", None)
     logging_steps=len(tokenized_train) // batch_size
+
+    if early_stopping:
+        save_strategy = "epoch"
+        save_total_limit = 2
+        load_best_model_at_end = True
+        metric_for_best_model = "eval_bleu"
+        greater_is_better = True
+        if callbacks is None:
+            callbacks = [EarlyStoppingCallback(early_stopping_patience=early_stopping_patience)]
+    else:
+        save_strategy = "no"
+        save_total_limit = 1 # dummy assignment, No need to save intermediate models
+        load_best_model_at_end = False
+        metric_for_best_model = None
+        greater_is_better = None
+        if callbacks is None:
+            callbacks = []
     
     training_args = Seq2SeqTrainingArguments(
         output_dir=output_dir,
+        overwrite_output_dir=True,
         logging_dir=logging_dir,
         eval_strategy="epoch",
-        save_strategy="epoch",
-        save_total_limit=3,
-        load_best_model_at_end=True,
-        metric_for_best_model="bleu",
-        greater_is_better=True,
+        save_strategy=save_strategy,
+        **({"save_total_limit": save_total_limit} if save_strategy != "no" else {}),
+        metric_for_best_model=metric_for_best_model,
+        greater_is_better=greater_is_better,
+        load_best_model_at_end=load_best_model_at_end,
         warmup_steps=warmup_steps,
         learning_rate=learning_rate,
         weight_decay=weight_decay,
@@ -157,11 +160,7 @@ def train(model, tokenizer, output_dir, logging_dir, tokenized_train, tokenized_
         seed=seed
     )
 
-    callbacks = [EarlyStoppingCallback(early_stopping_patience=2)]
-    #if trial is not None:
-        #from optuna.integration.transformers import HuggingFacePruningCallback
-        #callbacks.append(HuggingFacePruningCallback(trial, "eval_bleu"))
-        
+    
     trainer = Seq2SeqTrainer(
         model=model,
         args=training_args,
@@ -179,17 +178,14 @@ def train(model, tokenizer, output_dir, logging_dir, tokenized_train, tokenized_
     trainer.save_model()
     # Evaluate and return BLEU score
     eval_results = trainer.evaluate()
-    bleu_score = eval_results.get("eval_bleu", None)
-    eval_loss = eval_results.get("eval_loss", None)
-    train_loss = train_result.training_loss if hasattr(train_result, "training_loss") else None
-    print(f"BLEU score: {bleu_score}")
-    return trainer, bleu_score, eval_loss, train_loss
+    
+    return trainer, train_result, eval_results
 
   
 def main():
     # Initialize WandB
     #wandb.init(project="ML for Translation Task", name="Model Training")
-    summary_path = "NMT_training_pipeline/training_summary_v2.tsv"
+    summary_path = "NMT_training_pipeline/training_summary_v3.tsv"
     config_path = "NMT_training_pipeline/configs/t5_config.yml"
     print("Loading configurations:")
 
@@ -212,6 +208,10 @@ def main():
     train_file=config["train_file"]
     val_file=config["val_file"]
     
+    if model_type == "t5":
+        if tokenizer.pad_token is None:
+            tokenizer.pad_token = tokenizer.eos_token
+        model.config.pad_token_id = tokenizer.pad_token_id
 
     if src_lang_code and tgt_lang_code:
         tokenizer.src_lang = src_lang_code
@@ -236,10 +236,10 @@ def main():
     # Load and preprocess data
     train_dataset, val_dataset = get_train_val_datasets(train_file, val_file, max_train=800, max_valid=100, shuffle=True)
     tokenized_train = preprocess_and_tokenize(
-        train_dataset, model_type, tokenizer, src_lang, tgt_lang, prefix, max_src_length, max_tgt_length, desc=f"Tokenizing train data"
+        train_dataset, tokenizer, src_lang, tgt_lang, prefix, max_src_length, max_tgt_length, desc=f"Tokenizing train data"
     )
     tokenized_val = preprocess_and_tokenize(
-        val_dataset, model_type, tokenizer, src_lang, tgt_lang, prefix, max_src_length, max_tgt_length, desc=f"Tokenizing val data"
+        val_dataset, tokenizer, src_lang, tgt_lang, prefix, max_src_length, max_tgt_length, desc=f"Tokenizing val data"
     )
 
     # Load and preprocess data
@@ -260,7 +260,7 @@ def main():
 
     # Train the model
     start_time = time.time()
-    _, bleu_score, eval_loss, train_loss = train(
+    _, train_result, eval_results = train(
         model, 
         tokenizer, 
         output_dir, 
@@ -283,14 +283,23 @@ def main():
     training_time = time.time() - start_time
     minutes, seconds = divmod(int(training_time), 60)
     training_time_str = f"{minutes:02d}:{seconds:02d}"
+
+    bleu_score = eval_results.get("eval_bleu", None)
+    eval_loss = eval_results.get("eval_loss", None)
+    train_loss = train_result.training_loss if hasattr(train_result, "training_loss") else None
+    gen_len = eval_results.get("eval_gen_len", None)
+    perplexity = math.exp(eval_loss) if eval_loss is not None else None
+
     
     
-    row = "{:<40}{:<16}{:<16}{:<16}{:<13}{:<15}{:<12}{:<12}{:<12}{:<12}\n".format(
+    row = "{:<40}{:<16}{:<16}{:<16}{:<13}{:<13}{:<13}{:<15}{:<12}{:<12}{:<14}{:<12}\n".format(
         config['model_name'],
         training_time_str,
         f"{train_loss:.2f}" if train_loss is not None else "NA",
         f"{eval_loss:.2f}" if eval_loss is not None else "NA",
+        f"{perplexity:.2f}" if perplexity is not None else "NA",
         f"{bleu_score:.2f}" if bleu_score is not None else "NA",
+        f"{gen_len:.2f}" if gen_len is not None else "NA",
         learning_rate,
         batch_size,
         num_epochs,
@@ -304,8 +313,8 @@ def main():
     write_header = not os.path.exists(summary_path)
     with open(summary_path, "a", encoding="utf-8") as f:
         if write_header:
-            header = "{:<40}{:<16}{:<16}{:<16}{:<13}{:<15}{:<12}{:<12}{:<12}{:<12}\n".format(
-                "model", "train_time", "train_loss", "eval_loss", "bleu_score", "learning_rate", "batch_size", "num_epochs", "weight_decay", "max_output_length"
+            header = "{:<40}{:<16}{:<16}{:<16}{:<13}{:<13}{:<13}{:<15}{:<12}{:<12}{:<14}{:<12}\n".format(
+                "model", "train_time", "train_loss", "eval_loss", "perplexity", "bleu_score", "gen_len", "learning_rate", "batch_size", "num_epochs", "weight_decay", "max_output_length"
                 )
             f.write(header)
         f.write(row)

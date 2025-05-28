@@ -144,21 +144,7 @@ def main():
         ("Tanhim/translation-En2De","marian", "en", "de"),
         ("facebook/m2m100_418M", "m2m100", "en", "de")
     ]
-     
-    #source_texts, references = extract_source_reference(tsv_file, source_column, target_column, num_sentences=200)
-    #for model_name, model_type, src_code, tgt_code in models:
-        #print(f"Translating with {model_name}...")
-        #translations = translate_sentences(
-            #source_texts,
-            #model_name,
-            #model_type=model_type,
-            #source_lang_code=src_code,
-            #target_lang_code=tgt_code,
-            #device=0
-        #)
-        #bleu = sacrebleu.corpus_bleu(translations, [references])
-        #print(f"BLEU score for {model_name}: {bleu.score}")
-        #save_model_results(model_name, source_texts, translations, references, bleu.score, output_file)
+    # Define the number of lines to test
     line_counts = [10, 100, 200]
     save_bleu_score(tsv_file, source_column, target_column, models, line_counts, bleu_file, translations_file, device=0)
     
