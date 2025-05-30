@@ -176,6 +176,9 @@ cython_debug/
 # Ignore files
 Model_Exploration/translation_pipeline_10L_summary.tsv
 Model_Exploration/translation_pipeline_100L_summary.tsv
+NMT_training_pipeline/training_summary_v2.tsv
+Model_Exploration/translation_pipeline_200L_summary.tsv
+Model_Exploration/model_comparison.tsv
 
 # ignore folders
 bicleaner-env/
@@ -185,3 +188,4 @@ Finetuning/nllb
 NMT_training_pipeline/outputs
 Finetuning/t5/t5_base_en-de_finetuned(32K)
 Finetuning/mT5
+NMT_training_pipeline/logs
