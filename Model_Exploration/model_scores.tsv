@@ -1,0 +1,22 @@
+lines   model                                        bleu_score  
+10      google-t5/t5-base                            28.81       
+100     google-t5/t5-base                            18.75       
+200     google-t5/t5-base                            14.73       
+10      Helsinki-NLP/opus-mt-en-de                   26.31       
+100     Helsinki-NLP/opus-mt-en-de                   22.22       
+200     Helsinki-NLP/opus-mt-en-de                   16.70       
+10      facebook/nllb-200-distilled-600M             24.42       
+100     facebook/nllb-200-distilled-600M             17.73       
+200     facebook/nllb-200-distilled-600M             13.78       
+10      facebook/mbart-large-50-many-to-many-mmt     21.73       
+100     facebook/mbart-large-50-many-to-many-mmt     21.76       
+200     facebook/mbart-large-50-many-to-many-mmt     16.30       
+10      DunnBC22/mbart-large-50-English_German_Translation14.30       
+100     DunnBC22/mbart-large-50-English_German_Translation12.92       
+200     DunnBC22/mbart-large-50-English_German_Translation9.89        
+10      Tanhim/translation-En2De                     22.29       
+100     Tanhim/translation-En2De                     21.06       
+200     Tanhim/translation-En2De                     15.67       
+10      facebook/m2m100_418M                         19.40       
+100     facebook/m2m100_418M                         18.50       
+200     facebook/m2m100_418M                         13.42       

@@ -1,5 +1,5 @@
 model                                   train_time      train_loss      eval_loss       perplexity   bleu_score   gen_len      learning_rate  batch_size  num_epochs  weight_decay  max_output_length
-google/mt5-base                         01:54           13.62           9.18            9676.91      0.70         6.77         5e-05          20          4           0.01          128         
 facebook/mbart-large-50-one-to-many-mmt 00:55           1.05            2.17            8.76         23.29        15.13        5e-05          20          4           0.01          128         
 facebook/nllb-200-distilled-600M        01:11           1.50            1.74            5.72         25.24        15.53        5e-05          20          4           0.01          128         
 google-t5/t5-base                       00:43           1.72            1.69            5.44         26.00        14.67        5e-05          20          4           0.01          128         
+google/mt5-base                         00:48           13.62           9.18            9676.91      0.70         6.77         5e-05          20          4           0.01          128         

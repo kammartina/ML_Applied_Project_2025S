@@ -27,8 +27,7 @@ def extract_source_reference(tsv_file, source_lang, target_lang, num_sentences=1
     # Check if the number of sentences requested is greater than the available data
     if num_sentences > len(parallel_data):
         raise ValueError(f"Requested number of sentences ({num_sentences}) exceeds available data ({len(parallel_data)}).")
-    #print(parallel_data.head())
-
+    
     # Select source texts
     source_texts = parallel_data[source_lang][:num_sentences].tolist()
     references = parallel_data[target_lang][:num_sentences].tolist()
@@ -63,14 +62,12 @@ def translate_sentences(
         translator = pipeline(task, model=model_name, device=device)
         for text in tqdm(source_texts, desc="Translating"):
             translation = translator(text)
-            #print(translation[0]['translation_text'])
             translations.append(translation[0]['translation_text'])
     elif model_type.lower() in ["mbart", "marian", "m2m100", "nllb"]:
         # For mBART/MarianMT/nllb/m2m100, use src_lang and tgt_lang
         translator = pipeline("translation", model=model_name, device=device)
         for text in tqdm(source_texts, desc="Translating"):
             translation = translator(text, src_lang=source_lang_code, tgt_lang=target_lang_code)
-            #print(translation[0]['translation_text'])
             translations.append(translation[0]['translation_text'])
     else:
         # Default: try pipeline with just the model
@@ -107,7 +104,6 @@ def save_bleu_score(tsv_file, source_column, target_column, models, line_counts,
     row_fmt = f"{{:<{col_widths[0]}}}{{:<{col_widths[1]}}}{{:<{col_widths[2]}.2f}}\n"
     with open(bleu_file, "w", encoding="utf-8") as bf:
         bf.write(header_fmt.format("lines", "model", "bleu_score"))
-    #for num_lines in line_counts:
     source_texts, references = extract_source_reference(tsv_file, source_column, target_column, num_sentences=max_line_count)
     for model_name, model_type, src_code, tgt_code in models:
         print(f"Translating {max_line_count} lines with {model_name}...")
@@ -134,19 +130,19 @@ def main():
     tsv_file = "Data/test.tsv"
     source_column = "en"
     target_column = "de"
-    translations_file = "/home/mlt_ml2/ML_Applied_Project_2025S/Model_Exploration/translation_output.tsv"
-    bleu_file = "/home/mlt_ml2/ML_Applied_Project_2025S/Model_Exploration/model_scores.tsv"
+    translations_file = "Model_Exploration/translation_output_t5_nllb.tsv"
+    bleu_file = "Model_Exploration/model_scores_t5_nllb.tsv"
     models = [
         ("google-t5/t5-base", "t5", "en", "de"),
-        ("Helsinki-NLP/opus-mt-en-de", "marian", "en", "de"),
-        ("facebook/nllb-200-distilled-600M", "nllb", "eng_Latn", "deu_Latn"),
-        ("facebook/mbart-large-50-many-to-many-mmt", "mbart", "en_XX", "de_DE"),
-        ("DunnBC22/mbart-large-50-English_German_Translation", "mbart", "en_XX", "de_DE"),
-        ("Tanhim/translation-En2De","marian", "en", "de"),
-        ("facebook/m2m100_418M", "m2m100", "en", "de")
+        #("Helsinki-NLP/opus-mt-en-de", "marian", "en", "de"),
+        ("facebook/nllb-200-distilled-600M", "nllb", "eng_Latn", "deu_Latn")
+        #("facebook/mbart-large-50-many-to-many-mmt", "mbart", "en_XX", "de_DE"),
+        #("DunnBC22/mbart-large-50-English_German_Translation", "mbart", "en_XX", "de_DE"),
+        #("Tanhim/translation-En2De","marian", "en", "de"),
+        #("facebook/m2m100_418M", "m2m100", "en", "de")
     ]
     # Define the number of lines to test
-    line_counts = [10, 100, 200]
+    line_counts = [512]
     save_bleu_score(tsv_file, source_column, target_column, models, line_counts, bleu_file, translations_file, device=0)
     
 if __name__ == "__main__":

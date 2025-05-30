@@ -17,7 +17,7 @@ import evaluate
 metric = evaluate.load("sacrebleu")
 import time
 from functools import partial
-import glob
+#import glob
 import numpy as np
 import math
 
@@ -63,7 +63,7 @@ def preprocess_and_tokenize(dataset, tokenizer, src_lang, tgt_lang, prefix, max_
             inputs = [prefix + inp for inp in inputs]
         model_inputs = tokenizer(inputs, max_length=max_src_length, padding=True, truncation=True)
         labels = tokenizer(text_target=targets, max_length=max_tgt_length, padding=True, truncation=True)
-        # 
+    
         if tokenizer.pad_token_id is not None:
             labels["input_ids"] = [
                 [(l if l != tokenizer.pad_token_id else -100) for l in label] for label in labels["input_ids"]
@@ -85,11 +85,11 @@ def compute_metrics(eval_preds, tokenizer):
     if isinstance(preds, tuple):
         preds = preds[0]
 
-    ### Ensure the predictions are within the vocabulary size
-    # It clips (limits) the values in the preds array to be within the valid range of token IDs for the tokenizer's vocabulary.
+    #show the number of tokens that need to be clipped
     num_clipped = np.sum(preds > tokenizer.vocab_size - 1)
-    print(f"Number of clipped tokens: {num_clipped}")
+    print(f"Number of tokens to be clipped: {num_clipped}")
     
+    # Ensure the predictions are within the vocabulary size by clipping the values in the preds array to be within the valid range of token IDs for the tokenizer's vocabulary.
     max_token_id = max(tokenizer.get_vocab().values())
     preds = np.clip(preds, 0, max_token_id)
 
@@ -120,7 +120,7 @@ def train(model, tokenizer, output_dir, logging_dir, tokenized_train, tokenized_
 
     if early_stopping:
         save_strategy = "epoch"
-        save_total_limit = 2
+        save_total_limit = early_stopping_patience + 1  # Save the best model and a few checkpoints
         load_best_model_at_end = True
         metric_for_best_model = "eval_bleu"
         greater_is_better = True
@@ -183,10 +183,8 @@ def train(model, tokenizer, output_dir, logging_dir, tokenized_train, tokenized_
 
   
 def main():
-    # Initialize WandB
-    #wandb.init(project="ML for Translation Task", name="Model Training")
     summary_path = "NMT_training_pipeline/training_summary_v3.tsv"
-    config_path = "NMT_training_pipeline/configs/t5_config.yml"
+    config_path = "NMT_training_pipeline/configs/mT5_config.yml"
     print("Loading configurations:")
 
 
@@ -219,18 +217,6 @@ def main():
 
     if model_type.lower().startswith("mbart"):
         model.config.forced_bos_token_id = tokenizer.convert_tokens_to_ids(tgt_lang_code)
-
-       
-    #train_dir = config["train_dir"]
-    #val_dir = config["val_dir"]
-    #num_chunks = 1
-
-    #train_chunks = sorted(glob.glob(os.path.join(train_dir, "train_chunk*.jsonl")))[:num_chunks]
-    #val_chunks = sorted(glob.glob(os.path.join(val_dir, "val_chunk*.jsonl")))[:num_chunks]
-
-    #for idx, (train_file, val_file) in enumerate(zip(train_chunks, val_chunks)):
-        #print(f"\n=== Training on chunk {idx+1} ===")
-        # Load model and tokenizer from previous step
    
     
     # Load and preprocess data
@@ -242,11 +228,7 @@ def main():
         val_dataset, tokenizer, src_lang, tgt_lang, prefix, max_src_length, max_tgt_length, desc=f"Tokenizing val data"
     )
 
-    # Load and preprocess data
-    #train_dataset, val_dataset = get_train_val_datasets(train_file, val_file)
-    #tokenized_train = preprocess_and_tokenize(train_dataset, model_type, tokenizer, src_lang, tgt_lang, prefix, max_src_length, max_tgt_length, desc="Tokenizing train dataset")
-    #tokenized_val = preprocess_and_tokenize(val_dataset, model_type, tokenizer, src_lang, tgt_lang, prefix, max_src_length, max_tgt_length, desc="Tokenizing validation dataset")
-
+   
     data_collator = DataCollatorForSeq2Seq(tokenizer=tokenizer, model=model)
     learning_rate = float(config["learning_rate"])
     weight_decay = float(config["weight_decay"])
@@ -277,9 +259,7 @@ def main():
         #num_beams=num_beams,
         max_length=max_output_length
     )
-    #trainer.save_model(output_dir)
-    #model_dir = output_dir
-    #print(f"Model after chunk {idx} saved to {output_dir}")
+    
     training_time = time.time() - start_time
     minutes, seconds = divmod(int(training_time), 60)
     training_time_str = f"{minutes:02d}:{seconds:02d}"
@@ -290,7 +270,6 @@ def main():
     gen_len = eval_results.get("eval_gen_len", None)
     perplexity = math.exp(eval_loss) if eval_loss is not None else None
 
-    
     
     row = "{:<40}{:<16}{:<16}{:<16}{:<13}{:<13}{:<13}{:<15}{:<12}{:<12}{:<14}{:<12}\n".format(
         config['model_name'],

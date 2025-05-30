@@ -5,8 +5,8 @@ seed: 42
 src_lang_code: "eng_Latn"
 tgt_lang_code: "deu_Latn"
 
-train_file: "/home/mlt_ml2/ML_Applied_Project_2025S/Data/train.clean.jsonl"
-val_file: "/home/mlt_ml2/ML_Applied_Project_2025S/Data/val.clean.jsonl"
+train_file: "Data/train.clean.jsonl"
+val_file: "Data/val.clean.jsonl"
 
 source_lang: "en"
 target_lang: "de"
@@ -20,4 +20,4 @@ num_train_epochs: 4
 batch_size: 20
 
 output_dir: "NMT_training_pipeline/outputs/nllb"
-logging_dir: "NMT_training_pipeline/logs/nllb"
+logging_dir: "NMT_training_pipeline/logs/nllb/final_run"
