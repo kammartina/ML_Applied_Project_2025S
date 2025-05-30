@@ -177,6 +177,7 @@ cython_debug/
 Model_Exploration/translation_pipeline_10L_summary.tsv
 Model_Exploration/translation_pipeline_100L_summary.tsv
 NMT_training_pipeline/training_summary_v2.tsv
+NMT_training_pipeline/training_summary.tsv
 Model_Exploration/translation_pipeline_200L_summary.tsv
 Model_Exploration/model_comparison.tsv
 
